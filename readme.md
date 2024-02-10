@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./gomon.jpg" alt="Gomon Logo" width="200" height="200"/>
+</p>
+
 # Gomon
 
 Gomon is a live reloader for Go applications, inspired by Nodemon. It monitors changes in your Go project files and automatically rebuilds and restarts your application, making development faster and more interactive.

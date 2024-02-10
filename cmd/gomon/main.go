@@ -26,7 +26,7 @@ func createDefaultConfig(filename string) {
 		Watch:  []string{"./"}, //watch all sub directories
 		Ignore: []string{"vendor/*", ".git/*", "tmp/*", binPath},
 		Build: config.BuildConfig{
-			// Command:   fmt.Sprintf("go build -o ./tmp/%s .", binName), // Adjust as needed for your project structure
+			// Command: fmt.Sprintf("go build -o ./tmp/%s .", binName), // Adjust as needed for your project structure
 			Command:   "go build -o ./tmp/main .", // Adjust as needed for your project structure
 			Directory: ".",                        // Assumes the build is done in the current directory
 

@@ -12,20 +12,27 @@ import (
 	"github.com/fatih/color"
 	"github.com/jithin-kg/gomon/internal/builder"
 	"github.com/jithin-kg/gomon/internal/config"
+	"github.com/jithin-kg/gomon/internal/utils"
 	"github.com/jithin-kg/gomon/internal/watcher"
 	"github.com/spf13/cobra"
 )
 
 func createDefaultConfig(filename string) {
+	binName := utils.GetBinaryName()
+	color.Yellow("binName %s", binName)
+	binPath := fmt.Sprintf("/tmp/%s", binName)
+
 	defaultConfig := &config.Config{
 		Watch:  []string{"./"}, //watch all sub directories
-		Ignore: []string{"vendor/*", ".git/*", "/tmp/*", "myapp"},
+		Ignore: []string{"vendor/*", ".git/*", "tmp/*", binPath},
 		Build: config.BuildConfig{
-			Command:   "go build -o myapp .", // Adjust as needed for your project structure
-			Directory: ".",                   // Assumes the build is done in the current directory
+			// Command:   fmt.Sprintf("go build -o ./tmp/%s .", binName), // Adjust as needed for your project structure
+			Command:   "go build -o ./tmp/main .", // Adjust as needed for your project structure
+			Directory: ".",                        // Assumes the build is done in the current directory
 
 		},
-		Run: "./myapp",
+		// Run: fmt.Sprintf("./tmp/%s", binName),
+		Run: "./tmp/main",
 		Env: map[string]string{},
 	}
 
@@ -70,6 +77,8 @@ func runApplication(runCmd string) {
 	appProcess.Stderr = os.Stderr
 
 	// start the application
+	log.Printf("Running application: %s", runCmd)
+
 	if err := appProcess.Start(); err != nil {
 		color.Red("Failed to start the application: %v", err)
 	} else {
@@ -95,6 +104,10 @@ func stopApplication() {
 }
 
 func buildAndRun(config *config.Config) {
+	// ensure tmp directory is created
+	if err := utils.EnsureTmpDirectory(); err != nil {
+		log.Fatalf("Failed to ensure tmp directory exists: %v", err)
+	}
 	b := builder.New(config.Build.Command, config.Build.Directory)
 	if err := b.Build(); err != nil {
 		color.Red("Build failed %v\n", err)
@@ -126,6 +139,7 @@ var rootCmd = &cobra.Command{
 		// initialise and start watcher
 		w, err := watcher.New(config.Watch, config.Ignore, func() {
 			// call back on file change
+			color.Blue("rebuilding config : %v\n", config)
 			buildAndRun(config)
 		})
 		if err != nil {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/fsnotify/fsnotify"
+	"github.com/jithin-kg/gomon/constants"
 	"github.com/jithin-kg/gomon/internal/utils"
 )
 
@@ -27,6 +28,7 @@ type Watcher struct {
 	buildTimer    *time.Timer
 	eventQueue    []fsnotify.Event
 	fileChecksums map[string]string
+	ConfigChange  chan struct{}
 }
 
 // new creates a new watcher
@@ -44,6 +46,7 @@ func New(paths []string, ignore []string, onChange func()) (*Watcher, error) {
 		buildDelay:    1 * time.Second,
 		eventQueue:    []fsnotify.Event{},
 		fileChecksums: make(map[string]string),
+		ConfigChange:  make(chan struct{}),
 	}, nil
 }
 func (w *Watcher) handleEvent(event fsnotify.Event) {
@@ -67,7 +70,6 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 	// if checksum changed
 	if lastChecksum, ok := w.fileChecksums[event.Name]; ok && lastChecksum == currentChecksum {
 		// checksum hastn changed, no need to rebuild
-		// w.flushEvents()
 		return
 	} else {
 		// checksum changed
@@ -89,7 +91,7 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 		// Now, it's safe to assume we're in a quiet period.
 		if len(w.eventQueue) > 0 {
 			color.Magenta("Triggering build due to quiet period after last event.")
-			w.triggerBuild()
+			w.triggerBuild(event.Name)
 			w.flushEvents() // Now it makes sense to clear the queue after confirming a build.
 		}
 	})
@@ -115,12 +117,19 @@ func (w *Watcher) flushEvents() {
 	// clear the event queue
 	w.eventQueue = []fsnotify.Event{}
 }
-func (w *Watcher) triggerBuild() {
+func (w *Watcher) triggerBuild(eventName string) {
+
 	// ensure this runs in a non blocking manner
 	go func() {
-		if w.OnChange != nil {
-			w.OnChange()
+		if filepath.Base(eventName) == constants.ConfigFileName {
+			color.Yellow("gomon.json changed")
+			w.ConfigChange <- struct{}{}
+		} else {
+			if w.OnChange != nil {
+				w.OnChange()
+			}
 		}
+
 	}()
 }
 

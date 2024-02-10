@@ -12,8 +12,9 @@ Installing from Local Changes (Development Version)
 cd cmd/gomon
 go build -o $GOPATH/bin/gomon
 or
-go build -o $GOPATH/bin/gomon ./cmd/gomon
+e
 rm -rf $GOPATH/bin/gomon
+gomon
 air
 --
 go build -o $GOPATH/bin/air

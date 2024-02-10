@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
+	"github.com/jithin-kg/gomon/constants"
 	"github.com/jithin-kg/gomon/internal/builder"
 	"github.com/jithin-kg/gomon/internal/config"
 	"github.com/jithin-kg/gomon/internal/utils"
@@ -20,19 +21,16 @@ import (
 func createDefaultConfig(filename string) {
 	binName := utils.GetBinaryName()
 	color.Yellow("binName %s", binName)
-	binPath := fmt.Sprintf("/tmp/%s", binName)
 
 	defaultConfig := &config.Config{
 		Watch:  []string{"./"}, //watch all sub directories
-		Ignore: []string{"vendor/*", ".git/*", "tmp/*", binPath},
+		Ignore: []string{"vendor/*", ".git/*", "tmp/*"},
 		Build: config.BuildConfig{
-			// Command: fmt.Sprintf("go build -o ./tmp/%s .", binName), // Adjust as needed for your project structure
-			Command:   "go build -o ./tmp/main .", // Adjust as needed for your project structure
-			Directory: ".",                        // Assumes the build is done in the current directory
+			Command:   fmt.Sprintf("go build -o ./tmp/%s .", binName), // Adjust as needed for your project structure
+			Directory: ".",                                            // Assumes the build is done in the current directory
 
 		},
-		// Run: fmt.Sprintf("./tmp/%s", binName),
-		Run: "./tmp/main",
+		Run: fmt.Sprintf("./tmp/%s", binName),
 		Env: map[string]string{},
 	}
 
@@ -123,24 +121,24 @@ var rootCmd = &cobra.Command{
 	Use:   "gomon",
 	Short: "Gomon monitors your Go project files and rebuilds them on changes.",
 	Run: func(cmd *cobra.Command, args []string) {
-		configFile := "gomon.json"
-		if _, err := os.Stat(configFile); os.IsNotExist(err) {
-			log.Printf("Configuration file %s not found. Creating default configuration.\n", configFile)
+
+		if _, err := os.Stat(constants.ConfigFileName); os.IsNotExist(err) {
+			log.Printf("Configuration file %s not found. Creating default configuration.\n", constants.ConfigFileName)
 			// here we have to add the logic to create the file with actual configuration
-			createDefaultConfig(configFile)
+			createDefaultConfig(constants.ConfigFileName)
 		}
-		config, err := config.LoadConfig(configFile)
+		appConfigs, err := config.LoadConfig(constants.ConfigFileName)
 		if err != nil {
-			log.Printf("Failed to load config file %s err: %v\n", configFile, err)
+			log.Printf("Failed to load config file %s err: %v\n", constants.ConfigFileName, err)
 		}
 		// perform an initial build before watching for file changes
-		buildAndRun(config)
+		buildAndRun(appConfigs)
 
 		// initialise and start watcher
-		w, err := watcher.New(config.Watch, config.Ignore, func() {
+		w, err := watcher.New(appConfigs.Watch, appConfigs.Ignore, func() {
 			// call back on file change
-			color.Blue("rebuilding config : %v\n", config)
-			buildAndRun(config)
+			color.Blue("rebuilding config : %v\n", appConfigs)
+			buildAndRun(appConfigs)
 		})
 		if err != nil {
 			log.Fatalf("Failed to create watcher %v\n", err)
@@ -148,8 +146,25 @@ var rootCmd = &cobra.Command{
 		w.Start()
 		defer w.Close()
 
-		// keep the application running
-		select {}
+		// // keep the application running
+		// select {}
+		// main loop
+
+		for {
+			select {
+			case <-w.ConfigChange:
+				color.GreenString("Config file updated")
+				// reload configuration
+				updatedConfig, err := config.LoadConfig(constants.ConfigFileName)
+				if err != nil {
+					log.Printf("Failed to load config %v\n", err)
+					continue
+				}
+				appConfigs = updatedConfig
+				buildAndRun(appConfigs)
+
+			}
+		}
 	},
 }
 
@@ -158,4 +173,5 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+
 }
